@@ -1,16 +1,18 @@
 FROM amazon/aws-cli:latest
-RUN curl -sL -o /usr/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64
-RUN chmod +x /usr/bin/jq
-RUN curl -sL -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && \
-    curl -sL -o /usr/bin/aws-iam-authenticator $(curl -s https://api.github.com/repos/kubernetes-sigs/aws-iam-authenticator/releases/115299038 | jq -r ' .assets[] | select(.name | contains("linux_amd64")    )' | jq -r '.browser_download_url')  && \
-    chmod +x /usr/bin/aws-iam-authenticator && \
-    chmod +x /usr/bin/kubectl
 
-# Add Argo Rollouts Plugin
-RUN curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
-RUN chmod +x ./kubectl-argo-rollouts-linux-amd64
-RUN mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
-RUN kubectl argo rollouts version
+ARG KUBECTL_RELEASE=v1.31.0
+ARG IAM_AUTHENTICATOR_RELEASE=0.6.11
+ARG ARGO_ROLLOUTS_RELEASE=v1.10.0
+
+# Direct release downloads only. api.github.com rate-limits unauthenticated
+# calls per IP, and shared CI runners regularly hit that limit.
+RUN curl -fsSL -o /usr/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_RELEASE}/bin/linux/amd64/kubectl" && \
+    curl -fsSL -o /usr/bin/aws-iam-authenticator "https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${IAM_AUTHENTICATOR_RELEASE}/aws-iam-authenticator_${IAM_AUTHENTICATOR_RELEASE}_linux_amd64" && \
+    curl -fsSL -o /usr/local/bin/kubectl-argo-rollouts "https://github.com/argoproj/argo-rollouts/releases/download/${ARGO_ROLLOUTS_RELEASE}/kubectl-argo-rollouts-linux-amd64" && \
+    chmod +x /usr/bin/kubectl /usr/bin/aws-iam-authenticator /usr/local/bin/kubectl-argo-rollouts && \
+    kubectl version --client && \
+    aws-iam-authenticator version && \
+    kubectl argo rollouts version
 
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
